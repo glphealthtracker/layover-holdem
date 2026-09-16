@@ -1,1 +1,85 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Closed</title></head><body style="font-family:system-ui;background:#111;color:#ddd;padding:40px;text-align:center"><p>This table is closed.</p></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="referrer" content="no-referrer" />
+  <title>LAYOVER</title>
+  <style>
+    :root { --felt:#16351f; --ink:#f3ead7; --muted:#b7c4b0; --gold:#e2c48a; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; height:100%; background:#0b160e; color:var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    body { display:flex; flex-direction:column; max-width:430px; margin:0 auto; min-height:100%; }
+    header { padding:10px 14px 0; display:flex; justify-content:space-between; align-items:baseline; }
+    header b { letter-spacing:.12em; font-size:12px; }
+    header span { color:var(--muted); font-size:12px; }
+    .table { margin:8px 10px; background: radial-gradient(ellipse at center, #1e4a2b 0%, var(--felt) 70%); border:6px solid #6a4a24; border-radius:160px / 110px; min-height:390px; position:relative; padding:10px; }
+    .board { text-align:center; padding-top:118px; }
+    .pot { color:var(--gold); font-size:13px; margin-bottom:8px; }
+    .cards { display:flex; justify-content:center; gap:5px; min-height:54px; }
+    .card { width:38px; height:54px; border-radius:5px; background:#f7f1e4; color:#1a1a1a; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:700; font-size:15px; line-height:1; box-shadow:0 2px 0 rgba(0,0,0,.25); }
+    .card.red { color:#b42318; }
+    .card.back { background:#2a1a12; color:#e2c48a; border:1px solid #e2c48a; }
+    .seat { position:absolute; width:92px; text-align:center; font-size:11px; }
+    .seat .name { font-weight:700; }
+    .seat .stack { color:var(--gold); }
+    .seat .hole { display:flex; justify-content:center; gap:3px; margin-top:4px; }
+    .seat .hole .card { width:28px; height:40px; font-size:12px; }
+    .seat.me { width:140px; }
+    .seat.me .hole .card { width:44px; height:62px; font-size:16px; }
+    .seat.turn { outline:2px solid var(--gold); border-radius:10px; padding:4px; background:rgba(0,0,0,.25); }
+    .seat.out { opacity:.35; }
+    .seat.dealer::after { content:"D"; position:absolute; top:-8px; right:8px; background:var(--gold); color:#111; border-radius:50%; width:16px; height:16px; font-size:10px; line-height:16px; }
+    .log { height:52px; overflow:hidden; padding:0 14px; color:var(--muted); font-size:12px; }
+    .acts { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding:10px 12px 18px; }
+    .acts button { min-height:48px; border:0; border-radius:12px; font-weight:700; font-size:15px; background:#234a2f; color:var(--ink); }
+    .acts button.raise { background:var(--gold); color:#1a1408; }
+    .acts button.fold { background:#3a2420; color:#f0c4bc; }
+    .acts button:disabled { opacity:.35; }
+    .raise-row { grid-column:1 / -1; display:flex; gap:6px; }
+    .raise-row button { flex:1; background:#2d5a38; font-size:13px; min-height:40px; }
+    .banner { text-align:center; padding:8px; color:var(--gold); font-size:14px; min-height:24px; }
+    .note { text-align:center; color:var(--muted); font-size:11px; padding:0 14px 12px; }
+  </style>
+</head>
+<body>
+  <header><b>LAYOVER</b><span id="meta">SNG</span></header>
+  <div class="table" id="table"></div>
+  <div class="banner" id="banner">Deal when ready.</div>
+  <div class="log" id="log"></div>
+  <div class="acts" id="acts"></div>
+  <p class="note">Fake chips. Nothing is saved. No account.</p>
+<script>
+const SUITS=["s","h","d","c"], SUIT_G={s:"\u2660",h:"\u2665",d:"\u2666",c:"\u2663"}, RANKS=[2,3,4,5,6,7,8,9,10,11,12,13,14], RCH={11:"J",12:"Q",13:"K",14:"A",10:"T"};
+const NAMES=["YOU","CAL","DEZ","HANK","VIC","MO"], STYLE=[null,"tight","lag","loose","nit","maniac"];
+function rc(r){return RCH[r]||String(r)}
+function isRed(s){return s==="h"||s==="d"}
+function cardEl(card,hide){if(!card)return '<div class="card back">?</div>';if(hide)return '<div class="card back">\u25c6</div>';return '<div class="card'+(isRed(card.s)?' red':'')+'">'+rc(card.r)+'<small>'+SUIT_G[card.s]+'</small></div>'}
+function deck(){const d=[];for(const s of SUITS)for(const r of RANKS)d.push({r,s});for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]]}return d}
+function combos(arr,k){const out=[];(function go(s,i){if(s.length===k){out.push(s.slice());return}for(let j=i;j<arr.length;j++){s.push(arr[j]);go(s,j+1);s.pop()}})([],0);return out}
+function eval5(cards){const rs=cards.map(c=>c.r).sort((a,b)=>b-a),ss=cards.map(c=>c.s),flush=ss.every(s=>s===ss[0]),uniq=[...new Set(rs)].sort((a,b)=>b-a);let straight=0;if(uniq.length===5){if(uniq[0]-uniq[4]===4)straight=uniq[0];if(uniq.join()==="14,5,4,3,2")straight=5}const counts={};rs.forEach(r=>counts[r]=(counts[r]||0)+1);const groups=Object.entries(counts).map(([r,n])=>({r:+r,n})).sort((a,b)=>b.n-a.n||b.r-a.r);const kick=groups.flatMap(g=>Array(g.n).fill(g.r));let cat=0,name="High";if(straight&&flush&&straight===14){cat=9;name="Royal"}else if(straight&&flush){cat=8;name="Straight flush"}else if(groups[0].n===4){cat=7;name="Quads"}else if(groups[0].n===3&&groups[1]&&groups[1].n===2){cat=6;name="Full house"}else if(flush){cat=5;name="Flush"}else if(straight){cat=4;name="Straight"}else if(groups[0].n===3){cat=3;name="Trips"}else if(groups[0].n===2&&groups[1]&&groups[1].n===2){cat=2;name="Two pair"}else if(groups[0].n===2){cat=1;name="Pair"}return{score:cat*1e10+kick[0]*1e8+(kick[1]||0)*1e6+(kick[2]||0)*1e4+(kick[3]||0)*1e2+(kick[4]||0),name}}
+function bestHand(seven){let best=null;for(const five of combos(seven,5)){const e=eval5(five);if(!best||e.score>best.score)best=e}return best}
+function preflopScore(h){const a=h[0].r,b=h[1].r,hi=Math.max(a,b),lo=Math.min(a,b),pair=a===b,suited=h[0].s===h[1].s;let s=pair?hi*12:hi*5+lo;if(suited)s+=8;if(hi-lo<=2&&!pair)s+=6;if(hi===14)s+=10;return s}
+const POS=[{x:"50%",y:"78%",transform:"translate(-50%,0)"},{x:"8%",y:"58%",transform:"none"},{x:"8%",y:"14%",transform:"none"},{x:"50%",y:"2%",transform:"translate(-50%,0)"},{x:"70%",y:"14%",transform:"none"},{x:"70%",y:"58%",transform:"none"}];
+const S={players:[],dealer:0,deck:[],board:[],pot:0,street:"idle",toAct:0,currentBet:0,minRaise:0,hand:0,blinds:[10,20],bbLevelHands:0,logLines:[]};
+function inHand(){return S.players.filter(p=>p.inHand)}
+function nextLive(i){for(let k=1;k<=6;k++){const j=(i+k)%6;if(S.players[j].inHand&&!S.players[j].allIn&&S.players[j].stack>0)return j}return -1}
+function nextSeated(i){for(let k=1;k<=6;k++){const j=(i+k)%6;if(S.players[j].stack>0)return j}return -1}
+function log(t){S.logLines.unshift(t);S.logLines=S.logLines.slice(0,4);document.getElementById("log").innerHTML=S.logLines.map(x=>"<div>"+x+"</div>").join("")}
+function resetPlayers(){S.players=NAMES.map((name,i)=>({id:i,name,stack:1500,hole:[],bet:0,inHand:false,allIn:false,acted:false,style:STYLE[i]}));S.dealer=0;S.hand=0;S.blinds=[10,20];S.bbLevelHands=0;S.pot=0;S.board=[]}
+function bumpBlinds(){S.bbLevelHands++;if(S.bbLevelHands>=10){S.bbLevelHands=0;const bb=S.blinds[1];const nbb=bb<100?bb+20:bb<400?bb+50:bb+100;S.blinds=[nbb/2,nbb];log("Blinds up "+S.blinds[0]+"/"+S.blinds[1])}}
+function newHand(){const seated=S.players.filter(p=>p.stack>0);if(seated.length===1){const w=seated[0];document.getElementById("banner").textContent=w.id===0?"You take the table. New SNG.":w.name+" takes the table. New SNG.";setTimeout(()=>{resetPlayers();newHand()},1400);return}if(S.players[0].stack<=0){document.getElementById("banner").textContent="Busted. New stack in 1.5s.";setTimeout(()=>{resetPlayers();newHand()},1500);return}bumpBlinds();S.hand++;S.deck=deck();S.board=[];S.pot=0;S.street="pre";S.players.forEach(p=>{p.hole=[];p.bet=0;p.acted=false;p.allIn=false;p.inHand=p.stack>0});S.dealer=nextSeated(S.dealer);const sb=nextSeated(S.dealer),bb=nextSeated(sb);post(sb,S.blinds[0]);post(bb,S.blinds[1]);S.currentBet=S.blinds[1];S.minRaise=S.blinds[1];S.players.filter(p=>p.inHand).forEach(p=>{p.hole=[S.deck.pop(),S.deck.pop()]});S.toAct=nextSeated(bb);log("Hand #"+S.hand+" \u00b7 D "+NAMES[S.dealer]);render();if(S.toAct!==0)setTimeout(aiLoop,420)}
+function post(i,amt){const p=S.players[i];const a=Math.min(amt,p.stack);p.stack-=a;p.bet+=a;S.pot+=a;if(p.stack===0)p.allIn=true}
+function stillToAct(){const active=S.players.filter(p=>p.inHand&&!p.allIn);if(active.length<=1)return false;const maxBet=Math.max(...S.players.filter(p=>p.inHand).map(p=>p.bet));return active.some(p=>!p.acted||p.bet<maxBet)}
+function dealStreet(){S.players.forEach(p=>{p.bet=0;p.acted=false});S.currentBet=0;S.minRaise=S.blinds[1];if(S.street==="pre"){S.deck.pop();S.board.push(S.deck.pop(),S.deck.pop(),S.deck.pop());S.street="flop"}else if(S.street==="flop"){S.deck.pop();S.board.push(S.deck.pop());S.street="turn"}else if(S.street==="turn"){S.deck.pop();S.board.push(S.deck.pop());S.street="river"}else{showdown();return}S.toAct=nextLive(S.dealer);log(S.street.toUpperCase());render();if(S.toAct!==0&&inHand().filter(p=>!p.allIn).length>1)setTimeout(aiLoop,500);else if(!stillToAct())setTimeout(dealStreet,500)}
+function showdown(){S.street="show";const cont=inHand();if(cont.length===1){cont[0].stack+=S.pot;log(cont[0].name+" takes "+S.pot);S.pot=0;render();setTimeout(newHand,1400);return}const scored=cont.map(p=>({p,ev:bestHand(p.hole.concat(S.board))})).sort((a,b)=>b.ev.score-a.ev.score);const top=scored[0].ev.score;const winners=scored.filter(x=>x.ev.score===top);const share=Math.floor(S.pot/winners.length);winners.forEach(w=>w.p.stack+=share);log(winners.map(w=>w.p.name+" "+w.ev.name).join(" \u00b7 ")+" \u00b7 "+share+" each");S.pot=0;render(true);setTimeout(newHand,2000)}
+function heroCan(){return S.toAct===0&&S.players[0].inHand&&!S.players[0].allIn&&(S.street==="pre"||S.street==="flop"||S.street==="turn"||S.street==="river")}
+function doAction(i,type,raiseTo){const p=S.players[i];if(!p.inHand||p.allIn)return;const need=S.currentBet-p.bet;if(type==="fold"){p.inHand=false;p.acted=true;log(p.name+" folds")}else if(type==="call"){const a=Math.min(need,p.stack);p.stack-=a;p.bet+=a;S.pot+=a;p.acted=true;if(p.stack===0)p.allIn=true;log(p.name+(need===0?" checks":" calls "+a))}else{const add=Math.min(raiseTo-p.bet,p.stack);if(add<=0){doAction(i,"call");return}const raiseAmt=(p.bet+add)-S.currentBet;p.stack-=add;p.bet+=add;S.pot+=add;p.acted=true;if(p.bet>S.currentBet){S.minRaise=Math.max(S.minRaise,raiseAmt);S.currentBet=p.bet;S.players.forEach(o=>{if(o.id!==i&&o.inHand&&!o.allIn)o.acted=false})}if(p.stack===0)p.allIn=true;log(p.name+(need===0?" bets ":" raises to ")+p.bet)}if(inHand().length===1){render();setTimeout(showdown,400);return}if(!stillToAct()){render();setTimeout(dealStreet,550);return}S.toAct=nextLive(i);render();if(S.toAct!==0)setTimeout(aiLoop,380+Math.random()*280)}
+function aiLoop(){if(S.toAct<0||S.toAct===0)return;const p=S.players[S.toAct];if(!p.inHand||p.allIn){S.toAct=nextLive(S.toAct);if(S.toAct!==0)return aiLoop();render();return}const need=S.currentBet-p.bet;let hs=S.board.length===0?preflopScore(p.hole):bestHand(p.hole.concat(S.board)).score/1e10;const style=p.style,loose=style==="loose"||style==="maniac",agg=style==="lag"||style==="maniac",tight=style==="tight"||style==="nit";let act="call",raiseTo=S.currentBet+Math.max(S.minRaise,S.blinds[1]);if(S.board.length===0){if(hs<28&&tight&&need>0)act="fold";else if(hs<22&&need>S.blinds[1]*2)act="fold";else if(hs>55||(agg&&hs>40)){act="raise";raiseTo=S.currentBet+S.blinds[1]*(agg?4:3)}else if(need===0&&loose&&Math.random()<0.25)act="raise";else act=need>p.stack*0.35&&hs<40?"fold":"call"}else{if(hs<1.2&&need>0&&tight)act="fold";else if(hs<1&&need>=S.blinds[1]*3)act="fold";else if(hs>=4||(hs>=2&&agg&&Math.random()<0.45)){act="raise";raiseTo=S.currentBet+Math.max(S.pot*0.6,S.blinds[1]*2)}else if(need===0&&hs>=2&&Math.random()<0.3){act="raise";raiseTo=Math.max(S.blinds[1]*2,Math.floor(S.pot*0.5))}else act="call"}raiseTo=Math.min(p.bet+p.stack,Math.floor(raiseTo));if(act==="raise"&&raiseTo<=S.currentBet)act="call";if(need>=p.stack&&act==="fold"&&hs>=2)act="call";doAction(p.id,act,raiseTo)}
+function hero(type,mult){if(!heroCan())return;if(type==="fold")return doAction(0,"fold");if(type==="call")return doAction(0,"call");const p=S.players[0];const raiseTo=S.currentBet===0?Math.max(S.blinds[1]*mult,S.blinds[1]*2):S.currentBet+Math.max(S.minRaise,S.blinds[1])*(mult===2?1:mult===3?2:3);doAction(0,"raise",Math.min(p.stack+p.bet,raiseTo))}
+function render(showAll){document.getElementById("meta").textContent="SNG \u00b7 "+S.blinds[0]+"/"+S.blinds[1]+" \u00b7 hand "+S.hand;const table=document.getElementById("table");table.innerHTML=S.players.map((p,i)=>{const pos=POS[i];const showHoles=p.hole.length&&(p.id===0||showAll||(S.street==="show"&&p.inHand));const cls=["seat",i===0?"me":"",S.toAct===i?"turn":"",p.stack<=0&&!p.inHand?"out":"",S.dealer===i?"dealer":""].join(" ");return '<div class="'+cls+'" style="left:'+pos.x+';top:'+pos.y+';transform:'+pos.transform+'"><div class="name">'+p.name+(p.allIn?" \u00b7 ALL-IN":"")+'</div><div class="stack">'+p.stack+(p.bet?" \u00b7 "+p.bet:"")+'</div><div class="hole">'+(showHoles?p.hole.map(c=>cardEl(c,false)).join(""):(p.inHand?cardEl(null,true)+cardEl(null,true):""))+'</div></div>'}).join("")+'<div class="board"><div class="pot">Pot '+S.pot+'</div><div class="cards">'+S.board.map(c=>cardEl(c)).join("")+'</div></div>';const banner=document.getElementById("banner");if(heroCan()){const need=S.currentBet-S.players[0].bet;banner.textContent=need>0?"To call "+need:"Your action"}else banner.textContent=S.toAct>=0?NAMES[S.toAct]+" to act":"";const acts=document.getElementById("acts");if(!heroCan()){acts.innerHTML='<button disabled>Fold</button><button disabled>Check / Call</button><button class="raise" disabled>Raise</button>';return}const need=S.currentBet-S.players[0].bet;acts.innerHTML='<button class="fold" onclick="hero(\x27fold\x27)">Fold</button><button onclick="hero(\x27call\x27)">'+(need>0?("Call "+need):"Check")+'</button><button class="raise" onclick="hero(\x27raise\x27,3)">Raise</button><div class="raise-row"><button onclick="hero(\x27raise\x27,2)">Min</button><button onclick="hero(\x27raise\x27,3)">2.5x</button><button onclick="hero(\x27raise\x27,5)">Pot-ish</button><button onclick="hero(\x27raise\x27,99)">All in</button></div>'}
+resetPlayers();render();setTimeout(newHand,300);
+</script>
+</body>
+</html>
